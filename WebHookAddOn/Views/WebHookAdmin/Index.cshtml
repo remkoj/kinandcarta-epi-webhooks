@@ -3,11 +3,12 @@
 @{
     Layout = "_Layout.cshtml";
 }
-<div class="epi-contentArea">
-    <h1 class="EP-prefix">Manage Webhooks</h1>
-    <p>
-        You can add, update and delete webhooks via the table below.
-    </p>
+<div class="epi-contentArea" style="margin-bottom: 20px">
+    <div class="epi-main-header">
+        <h2 class="epi-uif-typography mdc-typography--headline4" style="font-weight: 500">Webhooks</h2>
+    </div>
+    <p>You can add, update and delete webhooks via the table below.</p>
+    <button data-oui-component="true" class="oui-button oui-button--highlight oui-button--default" type="button" aria-live="polite" onclick="location.href = 'Edit'">Create Webhook</button>
 </div>
 
 <table role="presentation">
@@ -33,38 +34,43 @@
             <td role="gridcell" onclick="ShowFullResponse('@item.Id.ExternalId')">
                 @(item.LastExecuted.Equals(DateTime.MinValue) ? "" : item.LastExecuted.ToShortDateString() + " " + item.LastExecuted.ToLongTimeString() + ": ")
                 @(item.LastResult == null ? "" : item.LastResult.Split('\n').FirstOrDefault())
-                <span style="display: none" id="res@(item.Id.ExternalId)">@Server.HtmlEncode(item.LastResult ?? "").Replace("\n", "<br/>")</span>
+                <span style="display: none" id="res@(item.Id.ExternalId)">@Html.Encode(item.LastResult ?? "").Replace("\n", "<br/>")</span>
             </td>
         </tr>
     }
 </table>
-<br />
-<button data-dojo-type="dijit/form/Button" data-dojo-props="iconClass:'epi-iconPlus'" type="button" onclick="location.href = 'WebhookAdmin/edit/'">New Webhook</button>
 
 <script>
     function test(webhookId) {
-        $.getJSON("@Url.Action("Test")/" + webhookId, function (data) {
-            if (data.Success) {
+
+        fetch("@Url.Action("Test")/" + webhookId)
+            .then(r => {
+                console.log(r.status, r.statusText)
+                return r.json()
+            }).then(data => {
+            if (data) 
+            {
                 require(["epi/shell/DialogService"], function (dialogService) {
                     dialogService.alert({
                         heading: "Success",
-                        content: data.Response,
+                        content: data,
                         description: "",
                         iconClass: "epi-iconSuccess  epi-icon--colored"
                     });
                 });
-            } else {
+            } else 
+            {
                 require(["epi/shell/DialogService"], function (dialogService) {
                     dialogService.alert({
                         heading: "Error",
-                        content: data.Response,
+                        content: data,
                         description: "",
                         iconClass: "epi-iconDanger epi-icon--colored"
                     });
                 });
             }
-        }).fail(function (jqxhr, textStatus, error) {
-            var err = textStatus + ", " + error;
+        }).catch(error => {
+            console.error(error)
         });
     }
 

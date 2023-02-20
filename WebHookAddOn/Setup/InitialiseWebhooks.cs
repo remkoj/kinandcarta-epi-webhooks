@@ -5,6 +5,8 @@ using EPiServer.Framework.Initialization;
 using EPiServer.ServiceLocation;
 using KinAndCarta.Connect.Webhooks.Data;
 using KinAndCarta.Connect.Webhooks.Extensions;
+using KinAndCarta.Connect.Webhooks.Services;
+using Microsoft.Extensions.DependencyInjection;
 using System.Configuration;
 
 namespace KinAndCarta.Connect.Webhooks.Setup
@@ -18,6 +20,8 @@ namespace KinAndCarta.Connect.Webhooks.Setup
         {
             context.ConfigurationComplete += (o, e) =>
             {
+                context.Services.AddSingleton<WebHookQueue>();
+                context.Services.AddHostedService<WebHookSender>();
                 context.Services.AddSingleton<IWebhookRepository, DefaultWebHookRepository>();
             };
         }

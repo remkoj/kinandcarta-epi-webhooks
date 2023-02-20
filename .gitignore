@@ -251,3 +251,6 @@ License.config
 
 # Configuration for Visual Studio Code favourites extention
 .favorites.json
+
+# Directly add NuGet Files to archive
+[Aa]ddon[Pp]ackage[Aa]rchive/net6.0/

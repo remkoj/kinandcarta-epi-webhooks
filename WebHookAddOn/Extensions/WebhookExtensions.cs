@@ -12,16 +12,22 @@ using System.Configuration;
 using System.Linq;
 using System.Net;
 using System.Text;
-using System.Text.RegularExpressions;
-using System.Web;
-using System.Web.Hosting;
+using EPiServer.ContentApi.Core.Configuration;
+using EPiServer.Cms.Shell;
+using System.Globalization;
+using EPiServer.Web;
+using Microsoft.Extensions.Hosting.Internal;
+using System.Net.Http;
+using KinAndCarta.Connect.Webhooks.Services;
 
 namespace KinAndCarta.Connect.Webhooks.Extensions
 {
     public static class WebhookExtensions
     {
-        private static readonly Lazy<IContentModelMapperFactory> _contentModelMapperFactory = new Lazy<IContentModelMapperFactory>(() => ServiceLocator.Current.GetInstance<IContentModelMapperFactory>());
+        private static readonly Lazy<IContentConverterResolver> _iContentConverterResolver = new Lazy<IContentConverterResolver>(() => ServiceLocator.Current.GetInstance<IContentConverterResolver>());
         private static readonly Lazy<IContentRepository> _contentRepository = new Lazy<IContentRepository>(() => ServiceLocator.Current.GetInstance<IContentRepository>());
+        private static readonly Lazy<ContentApiOptions> _contentApiOptions = new Lazy<ContentApiOptions>(() => ServiceLocator.Current.GetInstance<ContentApiOptions>());
+        private static readonly Lazy<WebHookQueue> _webHookQueue = new Lazy<WebHookQueue>(() => ServiceLocator.Current.GetInstance<WebHookQueue>());
         private static readonly int _maxDescendents = int.Parse(ConfigurationManager.AppSettings["WebhookMaxDescendents"] ?? "250");
 
         public static WebhookExecutionResponse Execute(this Webhook webhook, IContent content, EventType eventType, IWebhookRepository repo, Dictionary<string, object> extraData = null)
@@ -29,7 +35,7 @@ namespace KinAndCarta.Connect.Webhooks.Extensions
             var res = new WebhookExecutionResponse { Response = string.Empty, Success = false };
             try
             {
-                IContentModelMapper mapper = _contentModelMapperFactory.Value.GetMapper(content);
+                IContentConverter mapper = _iContentConverterResolver.Value.Resolve(content);
                 var refs = _contentRepository.Value.GetReferencesToContent(content.ContentLink, eventType.ImpactsDescendants);
                 var payload = new WebhookDetailedPayload(content, eventType.Key, DateTime.UtcNow);
                 var referencedBy = new List<ContentInfo>();
@@ -46,23 +52,28 @@ namespace KinAndCarta.Connect.Webhooks.Extensions
                     }
                 }
                 payload.ReferencedBy = referencedBy.GroupBy(x => x.ContentId).Select(x => x.FirstOrDefault());
-                payload.Content = mapper.TransformContent(content, false, "*");
+                payload.Content = mapper.Convert(content, new ConverterContext(
+                    content.ContentLink,
+                    CultureInfo.GetCultureInfo(content.LanguageBranch()),
+                    _contentApiOptions.Value,
+                    ContextMode.Default,
+                    string.Empty, string.Empty, true)
+                    );
                 payload.ExtraData = extraData;
 
                 var url = repo.ReplacePlaceholders(webhook.Url);
                 var uri = new Uri(url);
-                var servicePoint = ServicePointManager.FindServicePoint(uri);
-                servicePoint.Expect100Continue = false;
-                using (var wc = new WebClient())
+                using (var hc = new HttpClient())
                 {
-                    wc.Encoding = Encoding.UTF8;
+                    var request = new HttpRequestMessage(HttpMethod.Post, uri);
                     foreach (var header in webhook.Headers ?? new Dictionary<string, string>())
                     {
-                        wc.Headers.Add(repo.ReplacePlaceholders(header.Key), repo.ReplacePlaceholders(header.Value));
+                        request.Headers.Add(repo.ReplacePlaceholders(header.Key), repo.ReplacePlaceholders(header.Value));
                     }
-                    wc.Headers.Add(HttpRequestHeader.ContentType, "application/json");
-                    var response = wc.UploadString(url, "POST", JsonConvert.SerializeObject(payload));
-                    res.Response = response;
+                    request.Headers.Add(HttpRequestHeader.ContentType.ToString(), "application/json");
+                    request.Content = new StringContent(JsonConvert.SerializeObject(payload), Encoding.UTF8, "application/json");
+                    var response = hc.Send(request);
+                    res.Response = response.Content.ReadAsStringAsync().Result;
                     res.Success = true;
                 }
                 webhook.LastResult = $"OK\n{res.Response}";
@@ -87,9 +98,7 @@ namespace KinAndCarta.Connect.Webhooks.Extensions
             var webhooks = repo.GetWebhooksForContentEvent(content, eventType);
             if (!webhooks.Any()) return;
             foreach (var webhook in webhooks)
-            {
-                HostingEnvironment.QueueBackgroundWorkItem(ct => webhook.Execute(content, eventType, repo, extraData));
-            }
+                _webHookQueue.Value.Enqueue(() => webhook.Execute(content, eventType, repo, extraData));
         }
     }
 }

@@ -6,10 +6,11 @@ using EPiServer.Framework.Localization;
 using KinAndCarta.Connect.Webhooks.Data;
 using KinAndCarta.Connect.Webhooks.Extensions;
 using KinAndCarta.Connect.Webhooks.Models;
+using Microsoft.AspNetCore.Mvc;
+using Microsoft.AspNetCore.Mvc.Rendering;
 using System;
 using System.Collections.Generic;
 using System.Linq;
-using System.Web.Mvc;
 
 namespace KinAndCarta.Connect.Webhooks.Controllers
 {
@@ -38,14 +39,15 @@ namespace KinAndCarta.Connect.Webhooks.Controllers
         public JsonResult Tree(int parent = 0)
         {
             if (parent == 0) parent = ContentReference.RootPage.ID;
-            return Json(_contentLoader.GetChildren<IContent>(new ContentReference(parent)).Where(x => !(x is BlockData) && !(x is MediaData)).Select(x => new { id = x.ContentLink.ID, name = x.Name }), JsonRequestBehavior.AllowGet);
+            return Json(_contentLoader.GetChildren<IContent>(new ContentReference(parent)).Where(x => x is not BlockData && x is not MediaData).Select(x => new { id = x.ContentLink.ID, name = x.Name }) /*, JsonRequestBehavior.AllowGet*/);
         }
 
         public ActionResult Edit(Guid? guid)
         {
-            var vm = new EditWebhookViewModel();
-
-            vm.Webhook = (guid == null) ? new WebhookPostModel() : new WebhookPostModel(_repo.GetWebhook(guid.Value));
+            var vm = new EditWebhookViewModel
+            {
+                Webhook = (guid == null) ? new WebhookPostModel() : new WebhookPostModel(_repo.GetWebhook(guid.Value))
+            };
 
             if (vm.Webhook.ParentId > 0)
             {
@@ -89,18 +91,18 @@ namespace KinAndCarta.Connect.Webhooks.Controllers
                 var testEventType = webhook.EventTypes?.Select(x => _repo.GetEventTypes().FirstOrDefault(y => y.Key.Equals(x)))?.FirstOrDefault(x => x != null) ?? Constants.PublishEvent;
                 if (webhook.ContentTypes == null || !webhook.ContentTypes.Any() || webhook.ContentTypes.Contains(parentContent.ContentTypeID))
                 {
-                    return Json(webhook.Execute(parentContent, testEventType, _repo), JsonRequestBehavior.AllowGet);
+                    return Json(webhook.Execute(parentContent, testEventType, _repo) /*, JsonRequestBehavior.AllowGet*/);
                 }
                 else
                 {
                     var childRef = _contentLoader.GetDescendents(parentRef).FirstOrDefault(x => webhook.ContentTypes.Contains(_contentLoader.Get<IContent>(x).ContentTypeID));
                     if (childRef != null)
                     {
-                        return Json(webhook.Execute(_contentLoader.Get<IContent>(childRef), testEventType, _repo), JsonRequestBehavior.AllowGet);
+                        return Json(webhook.Execute(_contentLoader.Get<IContent>(childRef), testEventType, _repo) /*, JsonRequestBehavior.AllowGet*/);
                     }
                 }
             }
-            return Json(errorResponse, JsonRequestBehavior.AllowGet);
+            return Json(errorResponse /*, JsonRequestBehavior.AllowGet*/);
         }
 
 

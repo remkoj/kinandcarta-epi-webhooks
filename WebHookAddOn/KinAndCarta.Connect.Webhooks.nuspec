@@ -2,7 +2,7 @@
 <package xmlns="http://schemas.microsoft.com/packaging/2010/07/nuspec.xsd">
   <metadata>
     <id>KinAndCarta.Webhooks</id>
-    <version>0.1.6</version>
+    <version>0.2.0</version>
     <title>Kin + Carta Webhooks</title>
     <authors>Paul Gruffydd</authors>
     <owners>Kin + Carta</owners>
@@ -14,12 +14,12 @@
     <description>Adds functionality to set up and manage web hooks in Episerver sites via a UI</description>
     <tags>EPiServerModulePackage</tags>
     <dependencies>
-      <dependency id="EPiServer.ContentDeliveryApi.Core" version="[2.6.1,3.0.0)" />
+      <dependency id="EPiServer.ContentDeliveryApi.Core" version="[3.6.0)" />
     </dependencies>
   </metadata>
   <files>
     <file src="Web.Config.Transform" target="content\" />
     <file src="modules\_protected\KinAndCarta.Connect.Webhooks\**\*" target="content\modules\_protected\KinAndCarta.Connect.Webhooks\" />
-    <file src="bin\KinAndCarta.Connect.Webhooks.dll" target="lib\net472\" />
+    <file src="bin\KinAndCarta.Connect.Webhooks.dll" target="lib\net6.0\" />
   </files>
 </package>
